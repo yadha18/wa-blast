@@ -1,9 +1,23 @@
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
-export const api = axios.create({ baseURL: '/api' });
+// In local dev this stays empty and Vite's proxy (see vite.config.js) forwards
+// /api and /socket.io to the backend on :4000. In production — when frontend
+// and backend are deployed as separate Railway services — set VITE_BACKEND_URL
+// at build time to the backend's public URL, e.g. https://wa-blast-server.up.railway.app
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
-export const socket = io('/', { path: '/socket.io' });
+export const api = axios.create({ baseURL: `${BACKEND_URL}/api` });
+
+export const socket = io(BACKEND_URL || '/', { path: '/socket.io' });
+
+// Banner images are returned by the backend as relative paths (/uploads/...);
+// prefix them with the backend origin so they resolve correctly when the
+// frontend is hosted on a different domain than the backend.
+export function assetUrl(relativePath) {
+  if (!relativePath) return relativePath;
+  return `${BACKEND_URL}${relativePath}`;
+}
 
 export async function fetchWaStatus() {
   const { data } = await api.get('/wa/status');

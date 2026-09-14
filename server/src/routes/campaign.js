@@ -2,13 +2,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { db } from '../db/index.js';
 import { getWhatsApp } from '../whatsapp.js';
 import { toWhatsAppJid } from '../utils/phoneValidator.js';
+import { DATA_DIR } from '../config.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BANNER_DIR = path.join(__dirname, '..', '..', 'uploads', 'banners');
+const BANNER_DIR = path.join(DATA_DIR, 'uploads', 'banners');
 fs.mkdirSync(BANNER_DIR, { recursive: true });
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);

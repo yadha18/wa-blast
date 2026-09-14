@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { uploadBanner, removeBanner } from '../api';
+import { uploadBanner, removeBanner, assetUrl } from '../api';
 
 export default function ComposePanel({ disabled, campaign, onSend, onPause, onResume, onStop, running }) {
   const [message, setMessage] = useState('Halo {{nama}}, ');
@@ -15,7 +15,7 @@ export default function ComposePanel({ disabled, campaign, onSend, onPause, onRe
     setBannerBusy(true);
     try {
       const { bannerUrl } = await uploadBanner(campaign.id, file);
-      setBannerPreview(bannerUrl);
+      setBannerPreview(assetUrl(bannerUrl));
     } catch (err) {
       setBannerError(err.response?.data?.error || 'Gagal mengunggah banner.');
     } finally {

@@ -1,9 +1,9 @@
 import { Boom } from '@hapi/boom';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import pino from 'pino';
 import QRCode from 'qrcode';
+import { DATA_DIR } from './config.js';
 
 // Baileys is CommonJS; importing it via a plain ESM default/named import is
 // unreliable across versions (named exports sometimes end up undefined after
@@ -13,8 +13,7 @@ const baileysPkg = require('@whiskeysockets/baileys');
 const makeWASocket = baileysPkg.default || baileysPkg.makeWASocket || baileysPkg;
 const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = baileysPkg;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUTH_DIR = path.join(__dirname, '..', 'sessions');
+const AUTH_DIR = path.join(DATA_DIR, 'sessions');
 
 const logger = pino({ level: 'silent' });
 
