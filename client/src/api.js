@@ -7,7 +7,7 @@ import { io } from 'socket.io-client';
 // at build time to the backend's public URL, e.g. https://wa-blast-server.up.railway.app
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
-export const api = axios.create({ baseURL: `${BACKEND_URL}/api` });
+export const api = axios.create({ baseURL: `${BACKEND_URL}/api`, timeout: 30000 });
 
 export const socket = io(BACKEND_URL || '/', { path: '/socket.io' });
 
@@ -34,18 +34,18 @@ export async function uploadContacts(file, name, message) {
   form.append('file', file);
   form.append('name', name);
   form.append('message', message);
-  const { data } = await api.post('/upload', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // Do NOT set Content-Type manually here — the browser must generate the
+  // multipart boundary itself when sending a FormData body. Setting
+  // 'multipart/form-data' explicitly (without a boundary) breaks parsing on
+  // the server, sometimes silently.
+  const { data } = await api.post('/upload', form);
   return data;
 }
 
 export async function uploadBanner(campaignId, file) {
   const form = new FormData();
   form.append('banner', file);
-  const { data } = await api.post(`/campaigns/${campaignId}/banner`, form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const { data } = await api.post(`/campaigns/${campaignId}/banner`, form);
   return data;
 }
 
