@@ -37,25 +37,35 @@ router.post('/', upload.single('file'), (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
 
-  const insertMany = db.transaction((rows) => {
-    insertCampaign.run(campaignId, campaignName, message, rows.length);
+  const insertMany = (rows) => {
     let validCount = 0;
     let invalidCount = 0;
-    for (const row of rows) {
-      const { valid, reason, normalized } = normalizePhone(row.rawPhone);
-      if (valid) validCount++; else invalidCount++;
-      insertContact.run(
-        campaignId,
-        String(row.rawPhone ?? ''),
-        normalized,
-        String(row.name ?? ''),
-        valid ? 1 : 0,
-        reason,
-        valid ? 'pending' : 'invalid'
-      );
+    // node:sqlite has no db.transaction() helper (unlike better-sqlite3) —
+    // wrap the batch insert in an explicit transaction manually so a
+    // mid-batch failure doesn't leave a partially-inserted campaign behind.
+    db.exec('BEGIN');
+    try {
+      insertCampaign.run(campaignId, campaignName, message, rows.length);
+      for (const row of rows) {
+        const { valid, reason, normalized } = normalizePhone(row.rawPhone);
+        if (valid) validCount++; else invalidCount++;
+        insertContact.run(
+          campaignId,
+          String(row.rawPhone ?? ''),
+          normalized,
+          String(row.name ?? ''),
+          valid ? 1 : 0,
+          reason,
+          valid ? 'pending' : 'invalid'
+        );
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
     }
     return { validCount, invalidCount };
-  });
+  };
 
   const { validCount, invalidCount } = insertMany(rows);
 

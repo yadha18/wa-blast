@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import fs from 'fs';
 import path from 'path';
 import { DATA_DIR } from '../config.js';
@@ -6,8 +6,8 @@ import { DATA_DIR } from '../config.js';
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const dbPath = path.join(DATA_DIR, 'data.sqlite');
 
-export const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
+export const db = new DatabaseSync(dbPath);
+db.exec('PRAGMA journal_mode = WAL');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS campaigns (
