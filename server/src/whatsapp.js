@@ -1,4 +1,5 @@
 import { Boom } from '@hapi/boom';
+import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import pino from 'pino';
@@ -16,6 +17,21 @@ const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = b
 const AUTH_DIR = path.join(DATA_DIR, 'sessions');
 
 const logger = pino({ level: 'silent' });
+
+/**
+ * Wipes the local auth session so the next start() can't get stuck retrying
+ * with credentials WhatsApp has already invalidated (which produces an
+ * infinite loggedOut close-loop with no QR ever shown again).
+ */
+function clearSession() {
+  try {
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+    console.log('[WA] Sesi lokal dibersihkan — siap membuat QR baru.');
+  } catch (err) {
+    console.error('[WA] Gagal membersihkan sesi lokal:', err.message);
+  }
+}
 
 class WhatsAppManager {
   constructor(io) {
@@ -81,21 +97,29 @@ class WhatsAppManager {
       if (connection === 'close') {
         const errPayload = lastDisconnect?.error;
         const statusCode = new Boom(errPayload)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const loggedOut = statusCode === DisconnectReason.loggedOut;
+        const shouldReconnect = !loggedOut;
         console.error(
-          `[WA] Koneksi tertutup. statusCode=${statusCode} pesan="${errPayload?.message || 'tidak diketahui'}" willReconnect=${shouldReconnect}`
+          `[WA] Koneksi tertutup. statusCode=${statusCode} pesan="${errPayload?.message || 'tidak diketahui'}" loggedOut=${loggedOut}`
         );
         this.status = 'disconnected';
+        this.qrDataUrl = null;
         this.io.emit('wa:status', {
           status: this.status,
-          willReconnect: shouldReconnect,
+          willReconnect: true,
           error: errPayload?.message || null,
         });
-        if (shouldReconnect) {
+
+        if (loggedOut) {
+          // Session invalidated (manual logout, or unlinked from the phone).
+          // Stale credentials must be wiped or the next attempt just gets
+          // rejected again in a silent loop with no QR ever surfacing.
+          console.log('[WA] Sesi logged out — membersihkan kredensial lama dan membuat QR baru...');
+          clearSession();
+          setTimeout(() => this.start(), 1000);
+        } else if (shouldReconnect) {
           console.log('[WA] Mencoba menyambung ulang dalam 3 detik...');
           setTimeout(() => this.start(), 3000);
-        } else {
-          console.error('[WA] Sesi logged out. Hapus folder "sessions" lalu restart server untuk login ulang.');
         }
       }
     });
@@ -103,10 +127,23 @@ class WhatsAppManager {
 
   async logout() {
     if (this.sock) {
-      try { await this.sock.logout(); } catch (e) { /* ignore */ }
+      try {
+        // Tells WhatsApp to invalidate this session. This also fires our
+        // connection.update('close', loggedOut) handler above, which does
+        // the actual session cleanup + restart — so we don't duplicate it here.
+        await this.sock.logout();
+        return;
+      } catch (err) {
+        console.error('[WA] sock.logout() gagal, membersihkan sesi secara manual:', err.message);
+      }
     }
+    // No active socket, or logout() itself failed — clean up directly so we
+    // don't leave stale credentials behind for the next start().
+    clearSession();
     this.status = 'disconnected';
+    this.qrDataUrl = null;
     this.io.emit('wa:status', { status: this.status });
+    this.start().catch((err) => console.error('[WA] Gagal memulai ulang setelah logout:', err));
   }
 
   getStatus() {
