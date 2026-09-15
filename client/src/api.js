@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 // /api and /socket.io to the backend on :4000. In production — when frontend
 // and backend are deployed as separate Railway services — set VITE_BACKEND_URL
 // at build time to the backend's public URL, e.g. https://wa-blast-server.up.railway.app
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'wa-blast-production.up.railway.app';
 
 export const api = axios.create({ baseURL: `${BACKEND_URL}/api`, timeout: 30000 });
 
